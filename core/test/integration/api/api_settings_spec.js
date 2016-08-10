@@ -1,5 +1,3 @@
-/*globals describe, before, beforeEach, afterEach, it */
-/*jshint expr:true*/
 var testUtils           = require('../../utils'),
     should              = require('should'),
     _                   = require('lodash'),
@@ -107,7 +105,7 @@ describe('Settings API', function () {
             done(new Error('Allowed to read databaseVersion with external request'));
         }).catch(function (error) {
             should.exist(error);
-            error.type.should.eql('NoPermissionError');
+            error.errorType.should.eql('NoPermissionError');
             done();
         }).catch(done);
     });
@@ -153,7 +151,7 @@ describe('Settings API', function () {
             }).catch(function (err) {
                 should.exist(err);
 
-                err.type.should.eql('NoPermissionError');
+                err.errorType.should.eql('NoPermissionError');
 
                 done();
             }).catch(done);
@@ -191,9 +189,40 @@ describe('Settings API', function () {
         }).catch(function (err) {
             should.exist(err);
 
-            err.type.should.eql('ValidationError');
+            err.errorType.should.eql('ValidationError');
 
             done();
         }).catch(done);
+    });
+
+    it('set activeTimezone: unknown timezone', function (done) {
+        return callApiWithContext(defaultContext, 'edit', {settings: [{key: 'activeTimezone', value: 'MFG'}]}, {})
+            .then(function () {
+                done(new Error('We expect that the activeTimezone cannot be stored'));
+            }).catch(function (errors) {
+                should.exist(errors);
+                errors.length.should.eql(1);
+                errors[0].errorType.should.eql('ValidationError');
+                done();
+            }).catch(done);
+    });
+
+    it('set activeTimezone: unknown timezone', function (done) {
+        return callApiWithContext(defaultContext, 'edit', {settings: [{key: 'activeTimezone', value: 'MFG'}]}, {})
+            .then(function () {
+                done(new Error('We expect that the activeTimezone cannot be stored'));
+            }).catch(function (errors) {
+                should.exist(errors);
+                errors.length.should.eql(1);
+                errors[0].errorType.should.eql('ValidationError');
+                done();
+            }).catch(done);
+    });
+
+    it('set activeTimezone: known timezone', function (done) {
+        return callApiWithContext(defaultContext, 'edit', {settings: [{key: 'activeTimezone', value: 'Etc/UTC'}]}, {})
+            .then(function () {
+                done();
+            }).catch(done);
     });
 });

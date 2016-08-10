@@ -5,11 +5,13 @@ var Promise         = require('bluebird'),
     uuid            = require('node-uuid'),
     importer        = require('./data-importer'),
     tables          = require('../schema').tables,
+    i18n            = require('../../i18n'),
     validate,
     handleErrors,
     checkDuplicateAttributes,
     sanitize,
-    cleanError;
+    cleanError,
+    doImport;
 
 cleanError = function cleanError(error) {
     var temp,
@@ -35,7 +37,7 @@ cleanError = function cleanError(error) {
             value = error.raw.detail;
             offendingProperty = error.model;
         }
-        message = 'Duplicate entry found. Multiple values of "' + value + '" found for ' + offendingProperty + '.';
+        message = i18n.t('errors.data.import.index.duplicateEntryFound', {value: value, offendingProperty: offendingProperty});
     }
 
     offendingProperty = offendingProperty || error.model;
@@ -69,7 +71,7 @@ handleErrors = function handleErrors(errorList) {
 checkDuplicateAttributes = function checkDuplicateAttributes(data, comparedValue, attribs) {
     // Check if any objects in data have the same attribute values
     return _.find(data, function (datum) {
-        return _.all(attribs, function (attrib) {
+        return _.every(attribs, function (attrib) {
             return datum[attrib] === comparedValue[attrib];
         });
     });
@@ -77,7 +79,8 @@ checkDuplicateAttributes = function checkDuplicateAttributes(data, comparedValue
 
 sanitize = function sanitize(data) {
     var allProblems = {},
-        tableNames = _.sortBy(_.keys(data.data), function (tableName) {
+        tablesInData = _.keys(data.data),
+        tableNames = _.sortBy(_.keys(tables), function (tableName) {
             // We want to guarantee posts and tags go first
             if (tableName === 'posts') {
                 return 1;
@@ -87,6 +90,8 @@ sanitize = function sanitize(data) {
 
             return 3;
         });
+
+    tableNames = _.intersection(tableNames, tablesInData);
 
     _.each(tableNames, function (tableName) {
         // Sanitize the table data for duplicates and valid uuid and created_at values
@@ -165,15 +170,16 @@ validate = function validate(data) {
 
     _.each(_.keys(data.data), function (tableName) {
         _.each(data.data[tableName], function (importValues) {
-            validateOps.push(validation.validateSchema(tableName, importValues));
+            validateOps.push(validation.
+                validateSchema(tableName, importValues).reflect());
         });
     });
 
-    return Promise.settle(validateOps).then(function (descriptors) {
+    return Promise.all(validateOps).then(function (descriptors) {
         var errorList = [];
 
         _.each(descriptors, function (d) {
-            if (d.isRejected()) {
+            if (!d.isFulfilled()) {
                 errorList = errorList.concat(d.reason());
             }
         });
@@ -184,7 +190,7 @@ validate = function validate(data) {
     });
 };
 
-module.exports = function (data) {
+doImport = function (data) {
     var sanitizeResults = sanitize(data);
 
     data = sanitizeResults.data;
@@ -197,3 +203,5 @@ module.exports = function (data) {
         return handleErrors(result);
     });
 };
+
+module.exports.doImport = doImport;
